@@ -93,7 +93,7 @@ else
       BUILD_TYPE := release
 endif
 
-ALL_CCFLAGS := $(pkg-config --cflags libpng)
+ALL_CCFLAGS := $(shell pkg-config --libs --cflags libpng)
 ALL_CCFLAGS += $(NVCCFLAGS)
 ALL_CCFLAGS += $(EXTRA_NVCCFLAGS)
 ALL_CCFLAGS += $(addprefix -Xcompiler ,$(CCFLAGS))
@@ -101,7 +101,7 @@ ALL_CCFLAGS += $(addprefix -Xcompiler ,$(EXTRA_CCFLAGS))
 
 SAMPLE_ENABLED := 1
 
-ALL_LDFLAGS := $(pkg-config --libs libpng)
+ALL_LDFLAGS := 
 ALL_LDFLAGS += $(ALL_CCFLAGS)
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
@@ -147,17 +147,20 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-$(BINARY).o:$(BINARY).cu
+$(BINARY).o: $(BINARY).cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-$(BINARY): $(BINARY).o
+pngio.o: pngio.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+$(BINARY): pngio.o $(BINARY).o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 run: build
 	$(EXEC) ./$(BINARY)
 
 clean:
-	rm -f $(BINARY) $(BINARY).o
+	rm -f $(BINARY) *.o
 	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/$(BINARY)
 
 clobber: clean

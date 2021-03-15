@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include "png.h"
+#include "pngio.h"
 
 #define PNG_DEBUG 3
 #include <png.h>
@@ -40,14 +40,14 @@ png_bytep * row_pointers;
 
 void read_png_file(char* file_name)
 {
-	char header[8];    // 8 is the maximum size that can be checked
+	unsigned char header[8];    // 8 is the maximum size that can be checked
 
 	/* open file and test for it being a png */
 	FILE *fp = fopen(file_name, "rb");
 	if (!fp)
 		abort_("[read_png_file] File %s could not be opened for reading", file_name);
 	fread(header, 1, 8, fp);
-	if (png_sig_cmp(header, 0, 8))
+	if (png_sig_cmp(const_cast<png_const_bytep>(header), 0, 8))
 		abort_("[read_png_file] File %s is not recognized as a PNG file", file_name);
 
 

@@ -1,5 +1,5 @@
-#ifndef PNGH
-#define PNGH
+#ifndef PNGIOH
+#define PNGIOH
 
 #include <png.h>
 
@@ -15,4 +15,4 @@ extern png_bytep * row_pointers;
 void read_png_file(char* file_name);
 void write_png_file(char* file_name);
 
-#endif PNGH
+#endif // PNGIOH

@@ -1,5 +1,8 @@
 #include <iostream>
-#include "png.h"
+#include "pngio.h"
+
+void read_png_file();
+void write_png_file();
 
 __host__ int main(void)
 {
