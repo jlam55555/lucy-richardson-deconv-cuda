@@ -113,14 +113,29 @@ __global__ void invert(float *d1, int h, int rs, int isAlpha)
 	d1[y*rs + x] = 255-d1[y*rs + x];
 }
 
+// image and cuda properties
+cudaError_t err = cudaSuccess;
+float *dImg = nullptr;
+unsigned int rowStride, channels, bufSize, blockSize;
+dim3 dimGrid, dimBlock;
+
+// image processing routines go here
+__host__ int processImage(void)
+{
+	// invert image (for testing)
+	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride,
+		color_type==PNG_COLOR_TYPE_RGBA);
+	CUDAERR(cudaGetLastError(), "launch invert kernel");
+
+	return 0;
+}
+
+// driver for function
 __host__ int main(int argc, char **argv)
 {
 	// allocate buffers for image, copy into contiguous array
 	byte *hImgPix = nullptr, *dImgPix = nullptr;
-	float *dImg = nullptr;
-	cudaError_t err = cudaSuccess;
-	unsigned int rowStride, channels, bufSize, y, blockSize;
-	dim3 dimGrid, dimBlock;
+	unsigned int y;
 
 	// get input file from stdin
 	ERR(argc < 2, "missing input file as cmd parameter\n"
@@ -164,14 +179,10 @@ __host__ int main(int argc, char **argv)
 	byteToFloat<<<dimGrid, dimBlock>>>(dImgPix, dImg, height, rowStride);
 	CUDAERR(cudaGetLastError(), "launch byteToFloat kernel");
 
-	// invert image (for testing)
-	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride,
-		color_type==PNG_COLOR_TYPE_RGBA);
-	CUDAERR(cudaGetLastError(), "launch invert kernel");
-
-	// create gaussian filter
-
-	// apply gaussian filter
+	// image processing routine
+	if (processImage() < 0) {
+		return -1;
+	}
 
 	// convert image back to byte (dImg -> dImgPix)
 	floatToByte<<<dimGrid, dimBlock>>>(dImg, dImgPix, height, rowStride);
