@@ -38,7 +38,7 @@ png_infop info_ptr;
 int number_of_passes;
 png_bytep * row_pointers;
 
-void read_png_file(char* file_name)
+void read_png_file(const char* file_name)
 {
 	unsigned char header[8];    // 8 is the maximum size that can be checked
 
@@ -92,7 +92,7 @@ void read_png_file(char* file_name)
 }
 
 
-void write_png_file(char* file_name)
+void write_png_file(const char* file_name)
 {
 	/* create file */
 	FILE *fp = fopen(file_name, "wb");

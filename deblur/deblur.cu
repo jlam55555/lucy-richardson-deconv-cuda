@@ -52,12 +52,12 @@ __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 	// convolution
 	for (i = imin; i < imax; ++i) {
 		for (j = jmin; j < jmax; ++j) {
-			sum += d1[i*rs + j + c] * d2[(x-i)*rs + (y-j) + c];
+			sum += d1[i*rs + j*c + c] * d2[(x-i)*rs + (y-j)*c + c];
 		}
 	}
 
 	// set result
-	d3[x][y] = sum;
+	d3[x*rs + y*c + c] = sum;
 }
 
 // copy d1 to d2, but change from unsigned char to float
@@ -73,7 +73,7 @@ __global__ void byte_to_float(byte *d1, float *d2, int h, int rs)
 }
 
 // copy d1 to d2, but change from float to unsigned char
-__global__ void byte_to_float(byte *d1, float *d2, int h, int rs)
+__global__ void float_to_byte(byte *d1, float *d2, int h, int rs)
 {
 	unsigned int y, x;
 
