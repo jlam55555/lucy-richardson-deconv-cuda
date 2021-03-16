@@ -6,13 +6,13 @@ typedef unsigned char byte;
 
 #define ERR(cond, msg)\
 	if (cond) {\
-		fprintf(stderr, "error: " #msg "\n");\
+		fprintf(stderr, "error: " msg "\n");\
 		return -1;\
 	}
 
 #define CUDAERR(fn, msg)\
 	if ((err = fn) != cudaSuccess) {\
-		fprintf(stderr, "cuda error: " #msg " (%s)\n",\
+		fprintf(stderr, "cuda error: " msg " (%s)\n",\
 			cudaGetErrorString(err));\
 		return -1;\
 	}
@@ -39,7 +39,7 @@ __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 	x /= 3;
 
 	// out of bounds, no work to do
-	if (x > w1 || y > h1) {
+	if (x >= w1 || y >= h1) {
 		return;
 	}
 
@@ -74,7 +74,7 @@ __global__ void byteToFloat(byte *d1, float *d2, int h, int rs)
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	if (y > h || x > rs) {
+	if (y >= h || x >= rs) {
 		return;
 	}
 
@@ -89,7 +89,7 @@ __global__ void floatToByte(float *d1, byte *d2, int h, int rs)
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	if (y > h || x > rs) {
+	if (y >= h || x >= rs) {
 		return;
 	}
 
@@ -97,7 +97,7 @@ __global__ void floatToByte(float *d1, byte *d2, int h, int rs)
 }
 
 // simple filter for testing purposes: invert colors
-__global__ void invert(float *d1, int h, int rs)
+__global__ void invert(float *d1, int h, int rs, int isAlpha)
 {
 	unsigned int y, x;
 
@@ -105,15 +105,15 @@ __global__ void invert(float *d1, int h, int rs)
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
 
-	// x%4==3: don't invert alpha channel
-	if (y > h || x > rs || x%4 == 3) {
+	// x%4==3: don't invert alpha channel if applicable
+	if (y >= h || x >= rs || (isAlpha && x%4==3)) {
 		return;
 	}
 
 	d1[y*rs + x] = 255-d1[y*rs + x];
 }
 
-__host__ int main(void)
+__host__ int main(int argc, char **argv)
 {
 	// allocate buffers for image, copy into contiguous array
 	byte *hImgPix = nullptr, *dImgPix = nullptr;
@@ -122,18 +122,21 @@ __host__ int main(void)
 	unsigned int rowStride, channels, bufSize, y, blockSize;
 	dim3 dimGrid, dimBlock;
 
+	// get input file from stdin
+	ERR(argc < 2, "missing input file as cmd parameter\n"
+		"\tusage: ./deblur [INPUT_FILE].png");
+
 	// read input file
 	std::cout << "Reading file..." << std::endl;
-	read_png_file("test.png");
+	read_png_file(argv[1]);
 
-	// assuming RGBA
-	// TODO: don't assume RGBA, get from image
-	channels = 4;
+	// assume only RGB (3 channels) or RGBA (4 channels)
+	channels = color_type==PNG_COLOR_TYPE_RGBA ? 4 : 3;
 	rowStride = width * channels;
 	bufSize = rowStride * height;
 
 	// allocate host buffer, copy image to buffers
-	ERR(!(hImgPix = (byte *) malloc(bufSize*sizeof(byte))),
+	ERR(!(hImgPix = (byte *) malloc(bufSize)),
 		"allocating contiguous buffer for image");
 
 	// allocate other buffers
@@ -162,7 +165,8 @@ __host__ int main(void)
 	CUDAERR(cudaGetLastError(), "launch byteToFloat kernel");
 
 	// invert image (for testing)
-	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride);
+	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride,
+		color_type==PNG_COLOR_TYPE_RGBA);
 	CUDAERR(cudaGetLastError(), "launch invert kernel");
 
 	// create gaussian filter
