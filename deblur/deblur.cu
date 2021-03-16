@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 #include <cuda_runtime.h>
 #include "pngio.h"
 
@@ -21,53 +22,55 @@ typedef unsigned char byte;
  * Review:
  * 1d convolution: (x*y)[n] = sum_i {x[i]y[n-i]}
  * 	0 <= i < w1
- * 	0 <= n-i < w2 => w2-n < i <= n
+ * 	0 <= n-i < w2 => n-w2 < i <= n
+ *		=> max(0, n-w2+1) <= i < min(w1, n+1)
  * 2d convolution: (x*y)[n,m] = sum_i {sum_j {x[i,j]y[x-i,y-j]}}
  */
 
-// performs a 2d convolution; d3 should be the same size as d1;
+// performs a 2d convolution d3=d1*d2; d3 should be the same size as d1;
 // assumes that d1's dimensions > d2's dimensions
-__global__ void conv2d(float *d1, float *d2, float *d3, int ch,
+__global__ void static conv2d(float *d1, float *d2, float *d3, int ch,
 	int h1, int w1, int h2, int w2)
 {
-	unsigned int y, x, c, i, j, sum, imin, imax, jmin, jmax, rs;
+	unsigned int y, x, c, i, j, imin, imax, jmin, jmax, rs;
+	float sum;
 
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	c = x % 3;
-	x /= 3;
+	c = x % ch;
+	x /= ch;
 
 	// out of bounds, no work to do
 	if (x >= w1 || y >= h1) {
 		return;
 	}
 
-	// convolution result
-	sum = 0;
-
 	// appropriate ranges for convolution
-	imin = min(max(0, h2-y+1), h1);
-	imax = min(h1, y);
-	jmin = min(max(0, w2-x+1), w1);
-	jmax = min(w1, x);
+	imin = max(0, y-h2+1);
+	imax = min(h1, y+1);
+	jmin = max(0, x-w2+1);
+	jmax = min(w1, x+1);
 
 	// row stride (width * number of channels)
 	rs = ch*w1;
 
 	// convolution
+	// TODO: this only deals with the case where d2 has a single channel
+	//	(i.e., like a filter)
+	sum = 0;
 	for (i = imin; i < imax; ++i) {
 		for (j = jmin; j < jmax; ++j) {
-			sum += d1[i*rs + j*c + c] * d2[(x-i)*rs + (y-j)*c + c];
+			sum += d1[i*rs + j*ch + c] * d2[(y-i)*w2 + (x-j)];
 		}
 	}
 
 	// set result
-	d3[x*rs + y*c + c] = sum;
+	d3[y*rs + x*ch + c] = sum;
 }
 
 // copy d1 to d2, but change from unsigned char to float
-__global__ void byteToFloat(byte *d1, float *d2, int h, int rs)
+__global__ static void byteToFloat(byte *d1, float *d2, int h, int rs)
 {
 	unsigned int y, x;
 
@@ -82,7 +85,7 @@ __global__ void byteToFloat(byte *d1, float *d2, int h, int rs)
 }
 
 // copy d1 to d2, but change from float to unsigned char
-__global__ void floatToByte(float *d1, byte *d2, int h, int rs)
+__global__ static void floatToByte(float *d1, byte *d2, int h, int rs)
 {
 	unsigned int y, x;
 
@@ -97,7 +100,7 @@ __global__ void floatToByte(float *d1, byte *d2, int h, int rs)
 }
 
 // simple filter for testing purposes: invert colors
-__global__ void invert(float *d1, int h, int rs, int isAlpha)
+__global__ static void invert(float *d1, int h, int rs, int isAlpha)
 {
 	unsigned int y, x;
 
@@ -113,20 +116,64 @@ __global__ void invert(float *d1, int h, int rs, int isAlpha)
 	d1[y*rs + x] = 255-d1[y*rs + x];
 }
 
-// image and cuda properties
-cudaError_t err = cudaSuccess;
-float *dImg = nullptr;
-unsigned int rowStride, channels, bufSize, blockSize;
-dim3 dimGrid, dimBlock;
+// image, filter, and cuda properties
+static cudaError_t err = cudaSuccess;
+static float *dImg, *dTmp;	// dTmp used for intermediate outputs
+static unsigned int rowStride, channels, bufSize, blockSize;
+static dim3 dimGrid, dimBlock;
 
 // image processing routines go here
-__host__ int processImage(void)
+__host__ static int processImage(void)
 {
+	float *hFlt, *dFlt, fltSum, blurStd, cent;
+	unsigned int i, j, fltSize;
+
+/*
 	// invert image (for testing)
 	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride,
 		color_type==PNG_COLOR_TYPE_RGBA);
 	CUDAERR(cudaGetLastError(), "launch invert kernel");
+*/
 
+	// initialize filter; 3x3 circular gaussian filter
+	// https://en.wikipedia.org/wiki/Gaussian_blur
+	blurStd = 5;
+	fltSize = 6*blurStd;	// for factor of 6 see Wikipedia
+	cent = (fltSize-1.)/2;	// center of filter
+
+	ERR(!(hFlt = (float *) malloc(fltSize*fltSize*sizeof(float))),
+		"allocate hFlt");
+	fltSum = 0;
+	for (i = 0; i < fltSize; ++i) {
+		for (j = 0; j < fltSize; ++j) {
+			hFlt[i*fltSize+j] = exp(-(pow(i-cent, 2)+pow(j-cent, 2))
+				/(2*blurStd*blurStd))/(2*M_PI*blurStd*blurStd);
+			fltSum += hFlt[i*fltSize+j];
+		}
+	}
+
+	// normalize the filter
+	for (i = 0; i < fltSize*fltSize; ++i) {
+		hFlt[i] /= fltSum;
+	}
+
+	// allocate and copy filter to device
+	CUDAERR(cudaMalloc((void **) &dFlt, fltSize*fltSize*sizeof(float)),
+		"allocating dFlt");
+	CUDAERR(cudaMemcpy(dFlt, hFlt, fltSize*fltSize*sizeof(float),
+		cudaMemcpyHostToDevice), "copying hFlt to device");
+
+	// blur image (for testing)
+	conv2d<<<dimGrid, dimBlock>>>(dImg, dFlt, dTmp, channels,
+		height, width, fltSize, fltSize);
+
+	// result is currently in dTmp, move to dImg
+	CUDAERR(cudaMemcpy(dImg, dTmp, bufSize*sizeof(float),
+		cudaMemcpyDeviceToDevice), "copying dTmp to dImg");
+
+	// cleanup
+	free(hFlt);
+	CUDAERR(cudaFree(dFlt), "freeing dFlt");
 	return 0;
 }
 
@@ -158,6 +205,8 @@ __host__ int main(int argc, char **argv)
 	CUDAERR(cudaMalloc((void **) &dImgPix, bufSize), "allocating dImgPix");
 	CUDAERR(cudaMalloc((void **) &dImg, bufSize*sizeof(float)),
 		"allocating dImg");
+	CUDAERR(cudaMalloc((void **) &dTmp, bufSize*sizeof(float)),
+		"allocating dTmp");
 
 	// copy image to contiguous buffer (double pointer is not guaranteed
 	// to be contiguous)
@@ -180,6 +229,7 @@ __host__ int main(int argc, char **argv)
 	CUDAERR(cudaGetLastError(), "launch byteToFloat kernel");
 
 	// image processing routine
+	std::cout << "Processing image..." << std::endl;
 	if (processImage() < 0) {
 		return -1;
 	}
@@ -199,6 +249,7 @@ __host__ int main(int argc, char **argv)
 
 	// free buffers
 	CUDAERR(cudaFree(dImg), "freeing dImg");
+	CUDAERR(cudaFree(dTmp), "freeing dTmp");
 	CUDAERR(cudaFree(dImgPix), "freeing dImgPix");
 	free(hImgPix);
 
