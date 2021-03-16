@@ -12,7 +12,7 @@ extern png_infop info_ptr;
 extern int number_of_passes;
 extern png_bytep * row_pointers;
 
-void read_png_file(char* file_name);
-void write_png_file(char* file_name);
+void read_png_file(const char* file_name);
+void write_png_file(const char* file_name);
 
 #endif // PNGIOH
