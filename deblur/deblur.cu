@@ -28,11 +28,12 @@ typedef unsigned char byte;
  */
 
 // performs a 2d convolution d3=d1*d2; d3 should be the same size as d1;
-// assumes that d1's dimensions > d2's dimensions
+// assumes that d1's dimensions > d2's dimensions; this treats d2 like a
+// filter, and applies it centered at each point of d1
 __global__ void static conv2d(float *d1, float *d2, float *d3, int ch,
 	int h1, int w1, int h2, int w2)
 {
-	unsigned int y, x, c, i, j, imin, imax, jmin, jmax, rs;
+	unsigned int y, x, c, i, j, imin, imax, jmin, jmax, rs, ip, jp;
 	float sum;
 
 	// infer y, x, c from block/thread index
@@ -47,10 +48,10 @@ __global__ void static conv2d(float *d1, float *d2, float *d3, int ch,
 	}
 
 	// appropriate ranges for convolution
-	imin = max(0, y-h2+1);
-	imax = min(h1, y+1);
-	jmin = max(0, x-w2+1);
-	jmax = min(w1, x+1);
+	imin = max(0, y+h2/2-h2+1);
+	imax = min(h1, y+h2/2+1);
+	jmin = max(0, x+w2/2-w2+1);
+	jmax = min(w1, x+w2/2+1);
 
 	// row stride (width * number of channels)
 	rs = ch*w1;
@@ -61,7 +62,10 @@ __global__ void static conv2d(float *d1, float *d2, float *d3, int ch,
 	sum = 0;
 	for (i = imin; i < imax; ++i) {
 		for (j = jmin; j < jmax; ++j) {
-			sum += d1[i*rs + j*ch + c] * d2[(y-i)*w2 + (x-j)];
+			ip = i - h2/2;
+			jp = j - w2/2;
+
+			sum += d1[i*rs + j*ch + c] * d2[(y-ip)*w2 + (x-jp)];
 		}
 	}
 
@@ -137,8 +141,9 @@ __host__ static int processImage(void)
 
 	// initialize filter; 3x3 circular gaussian filter
 	// https://en.wikipedia.org/wiki/Gaussian_blur
-	blurStd = 5;
-	fltSize = 6*blurStd;	// for factor of 6 see Wikipedia
+	blurStd = 2;
+	fltSize = 6*blurStd+1;	// for factor of 6 see Wikipedia
+				// +1 to make it odd for better centering
 	cent = (fltSize-1.)/2;	// center of filter
 
 	ERR(!(hFlt = (float *) malloc(fltSize*fltSize*sizeof(float))),
