@@ -134,6 +134,8 @@ endif
 
 # for now, very simple Makefile: assume one file
 BINARY:=deblur
+SOURCES:=$(shell find *.cu)
+OBJECTS:=$(SOURCES:%.cu=%.o)
 
 # Target rules
 all: build
@@ -147,13 +149,10 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-$(BINARY).o: $(BINARY).cu
+%.o: %.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-pngio.o: pngio.cu
-	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
-
-$(BINARY): pngio.o $(BINARY).o
+$(BINARY): $(OBJECTS)
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 run: build
