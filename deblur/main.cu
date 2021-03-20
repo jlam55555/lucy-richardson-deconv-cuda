@@ -4,7 +4,7 @@
 
 // these are declared in main.h
 cudaError_t err = cudaSuccess;
-float *dImg, *dTmp1, *dTmp2;
+float *dImg, *dTmp1, *dTmp2, *dTmp3;
 unsigned int rowStride, channels, bufSize, blockSize;
 dim3 dimGrid, dimBlock;
 
@@ -20,7 +20,8 @@ __global__ static void byteToFloat(byte *d1, float *d2, int h, int rs)
 		return;
 	}
 
-	d2[y*rs + x] = d1[y*rs + x];
+	// TODO: remove 25
+	d2[y*rs + x] = d1[y*rs + x] + 25;
 }
 
 // copy d1 to d2, but change from float to unsigned char
@@ -35,7 +36,7 @@ __global__ static void floatToByte(float *d1, byte *d2, int h, int rs)
 		return;
 	}
 
-	d2[y*rs + x] = d1[y*rs + x];
+	d2[y*rs + x] = min(max(d1[y*rs + x], 0.), 255.);
 }
 
 // simple filter for testing purposes: invert colors
@@ -67,7 +68,9 @@ __host__ static void processImage(void)
 */
 	// blur(5);
 
-	deblur();
+	//blur(-1);
+
+	deblur(50, 2);
 }
 
 // driver for function
@@ -102,6 +105,8 @@ __host__ int main(int argc, char **argv)
 		"allocating dTmp1");
 	CUDAERR(cudaMalloc((void **) &dTmp2, bufSize*sizeof(float)),
 		"allocating dTmp2");
+	CUDAERR(cudaMalloc((void **) &dTmp3, bufSize*sizeof(float)),
+		"allocating dTmp3");
 
 	// copy image to contiguous buffer (double pointer is not guaranteed
 	// to be contiguous)
@@ -144,6 +149,7 @@ __host__ int main(int argc, char **argv)
 	CUDAERR(cudaFree(dImg), "freeing dImg");
 	CUDAERR(cudaFree(dTmp1), "freeing dTmp1");
 	CUDAERR(cudaFree(dTmp2), "freeing dTmp2");
+	CUDAERR(cudaFree(dTmp3), "freeing dTmp2");
 	CUDAERR(cudaFree(dImgPix), "freeing dImgPix");
 	free(hImgPix);
 
