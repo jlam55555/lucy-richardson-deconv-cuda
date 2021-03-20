@@ -27,31 +27,20 @@ __host__ void gaussian_filter(float blurStd, float **fltp, unsigned *fltSizep)
 
 	// normalize the filter
 	for (i = 0; i < fltSize*fltSize; ++i) {
-	//	flt[i] /= fltSum;
+		flt[i] /= fltSum;
 	}
 
 	*fltSizep = fltSize;
 	*fltp = flt;
 }
+
 // performs a gaussian blur on an image
 __host__ void blur(int blurSize)
 {
-	//float *hFlt, *dFlt, *tmp;
-	float *dFlt, *tmp;
+	float *hFlt, *dFlt, *tmp;
 	unsigned fltSize;
 
-	//gaussian_filter(blurSize, &hFlt, &fltSize);
-	//float hFlt[] = {0, -1, 0, -1, 5, -1, 0, -1, 0};
-	fltSize = 7;
-float hFlt[] = {
-      0,  0,  0, -1,  0,  0,  0,
-      0,  0,  0, -1,  0,  0,  0,
-      0,  0,  0, -1,  0,  0,  0,
-     -1, -1, -1, 13, -1, -1, -1,
-      0,  0,  0, -1,  0,  0,  0,
-      0,  0,  0, -1,  0,  0,  0,
-      0,  0,  0, -1,  0,  0,  0
- };
+	gaussian_filter(blurSize, &hFlt, &fltSize);
 
 	// allocate and copy filter to device
 	alloc_copy_htd(hFlt, (void **) &dFlt, fltSize*fltSize*sizeof(float),
@@ -67,6 +56,6 @@ float hFlt[] = {
 	dTmp1 = tmp;
 
 	// cleanup
-	//free(hFlt);
+	free(hFlt);
 	free_d(dFlt, "dFlt");
 }

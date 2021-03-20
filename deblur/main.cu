@@ -20,8 +20,7 @@ __global__ static void byteToFloat(byte *d1, float *d2, int h, int rs)
 		return;
 	}
 
-	// TODO: remove 25
-	d2[y*rs + x] = d1[y*rs + x] + 25;
+	d2[y*rs + x] = d1[y*rs + x];
 }
 
 // copy d1 to d2, but change from float to unsigned char
@@ -32,45 +31,19 @@ __global__ static void floatToByte(float *d1, byte *d2, int h, int rs)
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	if (y >= h || x >= rs) {
+	if (y >= h || x >= rs || (x%4==3)) {
 		return;
 	}
 
 	d2[y*rs + x] = min(max(d1[y*rs + x], 0.), 255.);
 }
 
-// simple filter for testing purposes: invert colors
-__global__ static void invert(float *d1, int h, int rs, int isAlpha)
-{
-	unsigned int y, x;
-
-	// infer y, x, c from block/thread index
-	y = blockDim.y * blockIdx.y + threadIdx.y;
-	x = blockDim.x * blockIdx.x + threadIdx.x;
-
-	// x%4==3: don't invert alpha channel if applicable
-	if (y >= h || x >= rs || (isAlpha && x%4==3)) {
-		return;
-	}
-
-	d1[y*rs + x] = 255-d1[y*rs + x];
-}
-
 // image processing routines go here
 __host__ static void processImage(void)
 {
-
-/*
-	// invert image (for testing)
-	invert<<<dimGrid, dimBlock>>>(dImg, height, rowStride,
-		color_type==PNG_COLOR_TYPE_RGBA);
-	CUDAERR(cudaGetLastError(), "launch invert kernel");
-*/
-	// blur(5);
-
-	//blur(-1);
-
-	deblur(50, 2);
+	// perform 25 iterations of the LR deconvolution
+	// with a gaussian kernel with sigma=2
+	deblur(25, 2);
 }
 
 // driver for function
@@ -139,6 +112,8 @@ __host__ int main(int argc, char **argv)
 	// copy image back (dImgPix -> hImgPix)
 	CUDAERR(cudaMemcpy(hImgPix, dImgPix, bufSize, cudaMemcpyDeviceToHost),
 		"copying image from device");
+
+	std::cout << "value at 0: " << ((int)hImgPix[0]) << std::endl;
 
 	// copy image back into original pixel buffers
 	for (y = 0; y < height; ++y) {

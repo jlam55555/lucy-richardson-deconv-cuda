@@ -21,8 +21,9 @@ __global__ static void pointwiseMultDiv(float *dA, float *dB, float *dC,
 		return;
 	}
 
-	//dC[ind] = isMult ? min(dA[ind] * dB[ind] / 255., 255.) : min(dA[ind] / (dB[ind]) * 255, 255.);
-	dC[ind] = isMult ? dA[ind] * dB[ind] / 255. : dA[ind] / (dB[ind]) * 255.;
+	dC[ind] = isMult
+		? dA[ind] * dB[ind] / 255.
+		: dA[ind] / max(dB[ind],1.) * 255.;	// prevent /0
 }
 
 // set image to median color
@@ -44,25 +45,8 @@ __global__ static void initImage(float *dImg, int height, int rowStride,
 // perform one "round" of LR deconvolution
 __host__ static void deblur_round(float *g, unsigned fltSize)
 {
-	// TODO: fix this horrible naming convention
-	float *g2, *dg2, *tmp;
+	float *tmp;
 	unsigned i, j;
-
-	// calculate g2(x) = g(-x)
-	/*ERR(!(g2 = (float *) malloc(fltSize*fltSize*sizeof(float))),
-		"allocate g2");
-	for (i = 0; i < fltSize; ++i) {
-		for (j = 0; j < fltSize; ++j) {
-			g2[i*fltSize+j] = g[(fltSize-1-i)*fltSize
-				+(fltSize-1-j)];
-		}
-	}
-
-	alloc_copy_htd(g2, (void **) &dg2, fltSize*fltSize*sizeof(float),
-		"flt inverted");*/
-
-	// g is symmetric
-	g2 = g;
 
 	// convolution: tmp3 = f_i * g
 	// dTmp3 = dTmp1 * flt
@@ -76,14 +60,9 @@ __host__ static void deblur_round(float *g, unsigned fltSize)
 		rowStride, channels, false);
 	CUDAERR(cudaGetLastError(), "launch div kernel");
 
-	/*tmp = dTmp1;
-	dTmp1 = dTmp2;
-	dTmp2 = tmp;
-	return;*/
-
-	// convolution: tmp3 = tmp2 * g(-x)
-	// dTmp3 = dTmp2 * g2
-	conv2d<<<dimGrid, dimBlock>>>(dTmp2, g2, dTmp3, channels,
+	// convolution: tmp3 = tmp2 * g(-x) = tmp2 * g (g is symmetric)
+	// dTmp3 = dTmp2 * g
+	conv2d<<<dimGrid, dimBlock>>>(dTmp2, g, dTmp3, channels,
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 2");
 
@@ -98,9 +77,6 @@ __host__ static void deblur_round(float *g, unsigned fltSize)
 	tmp = dTmp2;
 	dTmp2 = dTmp1;
 	dTmp1 = tmp;
-
-	//free(g2);
-	//free_d(dg2, "g2");
 }
 
 // lucy richardson deblur: deblurs what is in dImg
@@ -109,7 +85,7 @@ __host__ void deblur(int rounds, int blurSize)
 	float *hFlt, *dFlt, *tmp;
 	unsigned fltSize, i;
 
-	// initialize f_0
+	// initialize f_0 (initial estimate)
 	initImage<<<dimGrid, dimBlock>>>(dTmp1, height, rowStride, channels);
 	CUDAERR(cudaGetLastError(), "launch initImage kernel");
 

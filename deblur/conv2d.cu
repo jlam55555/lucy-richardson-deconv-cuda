@@ -7,6 +7,9 @@
  * 	0 <= n-i < w2 => n-w2 < i <= n
  *		=> max(0, n-w2+1) <= i < min(w1, n+1)
  * 2d convolution: (x*y)[n,m] = sum_i {sum_j {x[i,j]y[x-i,y-j]}}
+ *
+ * In this case there is an additional affine transform performed so that the
+ * resulting image is centered around d1's frame
  */
 
 // performs a 2d convolution d3=d1*d2; d3 should be the same size as d1;
@@ -15,7 +18,7 @@
 __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 	int h1, int w1, int h2, int w2)
 {
-	unsigned int y, x, c, i, j, imin, imax, jmin, jmax, rs, ip, jp;
+	int y, x, c, i, j, imin, imax, jmin, jmax, rs, ip, jp;
 	float sum;
 
 	// infer y, x, c from block/thread index
@@ -26,6 +29,12 @@ __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 
 	// out of bounds, no work to do
 	if (x >= w1 || y >= h1) {
+		return;
+	}
+
+	// don't mess with alpha
+	if (c == 3) {
+		d3[y*rs + x*ch + c] = 255;
 		return;
 	}
 
