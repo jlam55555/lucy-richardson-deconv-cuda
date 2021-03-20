@@ -9,7 +9,6 @@ __host__ void gaussian_filter(float blurStd, float **fltp, unsigned *fltSizep)
 
 	// initialize filter; 3x3 circular gaussian filter
 	// https://en.wikipedia.org/wiki/Gaussian_blur
-	blurStd = 3;
 	fltSize = 6*blurStd+1;	// for factor of 6 see Wikipedia
 				// +1 to make it odd for better centering
 	cent = (fltSize-1.)/2;	// center of filter

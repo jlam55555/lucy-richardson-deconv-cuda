@@ -43,7 +43,7 @@ __global__ static void initImage(float *dImg, int height, int rowStride,
 }
 
 // perform one "round" of LR deconvolution
-__host__ static void deblur_round(float *g, unsigned fltSize)
+__host__ static void deblurRound(float *g, unsigned fltSize)
 {
 	float *tmp;
 	unsigned i, j;
@@ -98,7 +98,7 @@ __host__ void deblur(int rounds, int blurSize)
 
 	// lucy-richardson iteration
 	for (i = 0; i < rounds; ++i) {
-		deblur_round(dFlt, fltSize);
+		deblurRound(dFlt, fltSize);
 	}
 
 	// dTmp1 is currently pointing at f_i (the estimate)

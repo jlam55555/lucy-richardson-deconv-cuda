@@ -29,13 +29,13 @@ figure; imshow(blr); title('Blurred Image')
 
 %%
 
-iter = 10;
+iter = 1;
 res_RL = 0.5*ones(size(original));
 res_RL(:,:,1) = RL_deconv(blr(:,:,1), PSF, iter); 
 res_RL(:,:,2) = RL_deconv(blr(:,:,2), PSF, iter); 
 res_RL(:,:,3) = RL_deconv(blr(:,:,3), PSF, iter);
 
-% figure; imshow(res_RL); title('Recovered Image')
+figure; imshow(res_RL); title('Recovered Image')
 
 imwrite(res_RL, '~/test2.png')
 
@@ -55,7 +55,7 @@ function result = RL_deconv(image, PSF, iterations)
         error_est     = conv2(relative_blur,PSF_HAT,'same');
         latent_est    = latent_est.* error_est;
         
-%         latent_est = error_est;
+%         latent_est = relative_blur;
     end
     result = latent_est;
 end
