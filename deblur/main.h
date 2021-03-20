@@ -23,9 +23,12 @@ typedef unsigned char byte;
 
 // image, filter, and cuda properties
 extern cudaError_t err;
-extern float *dImg, *dTmp;	// dTmp used for intermediate outputs
-extern unsigned int rowStride, channels, bufSize, blockSize;
+extern float *dImg, *dTmp1, *dTmp2;	// dTmp* used for intermediate outputs
+extern unsigned rowStride, channels, bufSize, blockSize;
 extern dim3 dimGrid, dimBlock;
+
+// defined in pngio.c
+extern int height, width;
 
 // util.cu
 __host__ void alloc_copy_htd(void *hptr, void **dptr, unsigned size,
@@ -36,6 +39,10 @@ __host__ void free_d(void *dptr, std::string name);
 
 // blur.cu
 __host__ void gaussian_filter(float blurStd, float **fltp, unsigned *fltSizep);
+__host__ void blur(int blurSize);
+
+// deblur.cu
+__host__ void deblur(void);
 
 // conv2d.cu
 __global__ void conv2d(float *d1, float *d2, float *d3, int ch,

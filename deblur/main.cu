@@ -4,7 +4,7 @@
 
 // these are declared in main.h
 cudaError_t err = cudaSuccess;
-float *dImg, *dTmp;
+float *dImg, *dTmp1, *dTmp2;
 unsigned int rowStride, channels, bufSize, blockSize;
 dim3 dimGrid, dimBlock;
 
@@ -58,8 +58,6 @@ __global__ static void invert(float *d1, int h, int rs, int isAlpha)
 // image processing routines go here
 __host__ static void processImage(void)
 {
-	float *hFlt, *dFlt, *tmp;
-	unsigned fltSize;
 
 /*
 	// invert image (for testing)
@@ -67,24 +65,9 @@ __host__ static void processImage(void)
 		color_type==PNG_COLOR_TYPE_RGBA);
 	CUDAERR(cudaGetLastError(), "launch invert kernel");
 */
-	gaussian_filter(3, &hFlt, &fltSize);
+	// blur(5);
 
-	// allocate and copy filter to device
-	alloc_copy_htd(hFlt, (void **) &dFlt, fltSize*fltSize*sizeof(float),
-		"flt");
-
-	// blur image (for testing)
-	conv2d<<<dimGrid, dimBlock>>>(dImg, dFlt, dTmp, channels,
-		height, width, fltSize, fltSize);
-
-	// result is currently in dTmp, swap pointers
-	tmp = dImg;
-	dImg = dTmp;
-	dTmp = tmp;
-
-	// cleanup
-	free(hFlt);
-	free_d(dFlt, "dFlt");
+	deblur();
 }
 
 // driver for function
@@ -115,8 +98,10 @@ __host__ int main(int argc, char **argv)
 	CUDAERR(cudaMalloc((void **) &dImgPix, bufSize), "allocating dImgPix");
 	CUDAERR(cudaMalloc((void **) &dImg, bufSize*sizeof(float)),
 		"allocating dImg");
-	CUDAERR(cudaMalloc((void **) &dTmp, bufSize*sizeof(float)),
-		"allocating dTmp");
+	CUDAERR(cudaMalloc((void **) &dTmp1, bufSize*sizeof(float)),
+		"allocating dTmp1");
+	CUDAERR(cudaMalloc((void **) &dTmp2, bufSize*sizeof(float)),
+		"allocating dTmp2");
 
 	// copy image to contiguous buffer (double pointer is not guaranteed
 	// to be contiguous)
@@ -157,7 +142,8 @@ __host__ int main(int argc, char **argv)
 
 	// free buffers
 	CUDAERR(cudaFree(dImg), "freeing dImg");
-	CUDAERR(cudaFree(dTmp), "freeing dTmp");
+	CUDAERR(cudaFree(dTmp1), "freeing dTmp1");
+	CUDAERR(cudaFree(dTmp2), "freeing dTmp2");
 	CUDAERR(cudaFree(dImgPix), "freeing dImgPix");
 	free(hImgPix);
 

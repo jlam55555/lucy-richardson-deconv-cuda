@@ -33,3 +33,28 @@ __host__ void gaussian_filter(float blurStd, float **fltp, unsigned *fltSizep)
 	*fltSizep = fltSize;
 	*fltp = flt;
 }
+// performs a gaussian blur on an image
+__host__ void blur(int blurSize)
+{
+	float *hFlt, *dFlt, *tmp;
+	unsigned fltSize;
+
+	gaussian_filter(blurSize, &hFlt, &fltSize);
+
+	// allocate and copy filter to device
+	alloc_copy_htd(hFlt, (void **) &dFlt, fltSize*fltSize*sizeof(float),
+		"flt");
+
+	// blur image (for testing)
+	conv2d<<<dimGrid, dimBlock>>>(dImg, dFlt, dTmp1, channels,
+		height, width, fltSize, fltSize);
+
+	// result is currently in dTmp1, swap pointers
+	tmp = dImg;
+	dImg = dTmp1;
+	dTmp1 = tmp;
+
+	// cleanup
+	free(hFlt);
+	free_d(dFlt, "dFlt");
+}
