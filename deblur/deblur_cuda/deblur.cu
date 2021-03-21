@@ -55,6 +55,7 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 1");
 
+	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_CONV2D);
 
 	// pointwise division: tmp2 = c / tmp3
@@ -63,6 +64,7 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		rowStride, channels, false);
 	CUDAERR(cudaGetLastError(), "launch div kernel");
 
+	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_MULTDIV);
 
 	// convolution: tmp3 = tmp2 * g(-x) = tmp2 * g (g is symmetric)
@@ -71,6 +73,7 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 2");
 
+	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_CONV2D);
 
 	// pointwise multiplication: tmp2 = (tmp3)(f_i)
@@ -79,6 +82,7 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		rowStride, channels, true);
 	CUDAERR(cudaGetLastError(), "launch mult kernel");
 
+	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_MULTDIV);
 
 	// swap pointers so that f_i = dTmp1
@@ -111,7 +115,9 @@ __host__ void deblur(int rounds, int blurSize)
 	// lucy-richardson iteration
 	t = clock_start();
 	for (i = 0; i < rounds; ++i) {
+		printf("Round %d\n", i);
 		deblurRound(dFlt, fltSize);
+		cudaDeviceSynchronize();
 		clock_lap(t, CLOCK_ROUND);
 	}
 

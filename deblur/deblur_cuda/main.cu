@@ -38,24 +38,18 @@ __global__ static void floatToByte(float *d1, byte *d2, int h, int rs)
 	d2[y*rs + x] = min(max(d1[y*rs + x], 0.), 255.);
 }
 
-// image processing routines go here
-__host__ static void processImage(void)
-{
-	// perform 25 iterations of the LR deconvolution
-	// with a gaussian kernel with sigma=2
-	deblur(25, 2);
-}
-
 // driver for function
 __host__ int main(int argc, char **argv)
 {
 	// allocate buffers for image, copy into contiguous array
 	byte *hImgPix = nullptr, *dImgPix = nullptr;
 	clock_t *t;
-	unsigned int y;
+	unsigned y, rounds, blurStd;
 
 	// get input file from stdin
-	ERR(argc < 3, "usage: ./deblur INPUT.png OUTPUT.png");
+	ERR(argc < 5, "usage: ./deblur INPUT.png OUTPUT.png ROUNDS BLURSTD");
+	rounds = atoi(argv[3]);
+	blurStd = atoi(argv[4]);
 
 	// read input file
 	std::cout << "Reading file..." << std::endl;
@@ -104,7 +98,8 @@ __host__ int main(int argc, char **argv)
 	// image processing routine
 	std::cout << "Processing image..." << std::endl;
 	t = clock_start();
-	processImage();
+	deblur(rounds, blurStd);
+	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_OVERALL);
 
 	// print statistics
