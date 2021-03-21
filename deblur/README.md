@@ -2,8 +2,12 @@
 Using Lucy-Richardson deconvolution with a circular
 Gaussian kernel to deblur an image (+ evaluation methods)
 
+---
+
 ### Report
 See the report [here][report].
+
+---
 
 ### Build instructions
 Use the Makefile in this directory to build everything.
@@ -31,12 +35,14 @@ flags for the Makefile (see an example in [buildx86.sh][buildx86])
 $ make -C deblur_cuda CUDA_PATH=/usr TARGET_ARCH=x86_64 SMS=30 [TARGET]
 ```
 
+---
+
 ### Results
 
 ##### Performance
 Tests performed on [earth_blurry.png][infile] 25 rounds RL w/ gaussian kernel (blur std=3)
 
-CPU version, i7-2600, 
+CPU version, local desktop, i7-2600 (3.8GHz x86_64)
 ```bash
 $ deblur_cpu/deblur samples/earth_blurry.png samples/earth_deblurred_cpu_std3.png 25 3
 overall: 219.035156s
@@ -45,7 +51,16 @@ conv2d: 4.369866
 mult/div: 0.010680
 ```
 
-CUDA version, GT740
+CPU version: Jetson Nano, Cortex-A57 (1.4GHz aarch64)
+```bash
+$ deblur_cpu/deblur samples/earth_blurry.png samples/earth_deblurred_cuda_std3.png 25 3
+overall: 880.111120s
+round: 35.203024s
+conv2d: 17.566531
+mult/div: 0.034960
+```
+
+CUDA version, GT740, Kepler 384 CUDA cores
 ```bash
 $ deblur_cuda/deblur samples/earth_blurry.png samples/earth_deblurred_cuda_std3.png 25 3
 overall: 5.92944s
@@ -53,6 +68,18 @@ round: 0.237075s
 conv2d: 0.11415s
 mult/div: 0.0043831s
 ```
+
+CUDA version, Jetson Nano, Maxwell 128 CUDA cores
+
+(the clock() function didn't work correctly, so this is using Unix's time command)
+```bash
+$ time deblur_cuda/deblur samples/earth_blurry.png samples/earth_deblurred_cuda_std3.png 25 3
+real    0m9.380s
+user    0m1.000s
+sys     0m0.228s
+```
+Note that this also includes setup/cleanup time, and reading/writing the file takes
+some time on the Jetson Nano; an estimate of the actual deblur time is 8s.
 
 ##### Attempting different blur radii (CUDA only)
 Gaussian kernel std
