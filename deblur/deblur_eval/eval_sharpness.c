@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
 	// get files
 	if (argc < 2) {
-		printf("usage: %s IMG.png [IMG2.png ...]\n",
+		printf("usage: %s IMG.png [IMG2.png ...]\n"
 			"\tmeasures the sharpness of each image\n", argv[0]);
 		return -1;
 	}

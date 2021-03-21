@@ -11,7 +11,7 @@ all: $(BINARIES)
 
 # static pattern rule: https://stackoverflow.com/a/15718720
 $(BINARIES): %: %.o pngio.o
-	$(CC) $(LDFLAGS) -o $@ $< pngio.o
+	$(CC) -o $@ $< pngio.o $(LDFLAGS) 
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<

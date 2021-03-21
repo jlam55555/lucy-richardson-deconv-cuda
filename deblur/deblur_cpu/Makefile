@@ -6,7 +6,7 @@ CFLAGS:=$(shell pkg-config --cflags libpng)
 LDFLAGS:=$(shell pkg-config --libs libpng) -lm
 
 $(BINARY): $(OBJECTS)
-	$(CC) $(LDFLAGS) -o $(BINARY) $(OBJECTS)
+	$(CC) -o $(BINARY) $(OBJECTS) $(LDFLAGS) 
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
