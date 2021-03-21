@@ -158,6 +158,7 @@ $(BINARY): $(OBJECTS)
 run: build
 	$(EXEC) ./$(BINARY)
 
+.PHONY:
 clean:
 	rm -f $(BINARY) *.o
 	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/$(BINARY)

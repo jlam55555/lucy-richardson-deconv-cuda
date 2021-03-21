@@ -1,5 +1,31 @@
 # deblur
 
+### Build instructions
+Use the Makefile in this directory to build everything.
+```bash
+$ make [all] [clean]
+```
+
+You will still need to pass in any system-specific CUDA build parameters, e.g.:
+```
+$ make all CUDA_PATH=/usr TARGET_ARCH=x86_64 SMS=30
+```
+
+Or, to build it each program manually:
+
+##### CPU-only programs
+```bash
+$ make -C deblur_cpu [TARGET]
+$ make -C deblur_eval [TARGET]
+```
+
+##### CUDA application
+For the CUDA application, you may need to specify the appropriate
+flags for the Makefile (see an example in [buildx86.sh][buildx86])
+```bash
+$ make -C deblur_cuda CUDA_PATH=/usr TARGET_ARCH=x86_64 SMS=30 [TARGET]
+```
+
 ### Report
 coming soon...
 
@@ -78,3 +104,4 @@ Sharpness measure of samples/earth.png: 1694.936890
 ```
 
 [infile]: samples/earth_blurry.png
+[buildx86]: deblur_cuda/buildx86.sh
