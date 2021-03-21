@@ -1,2 +1,6 @@
 **/a.out
 **/build
+**/*.o
+**/.*.swp
+
+.idea
