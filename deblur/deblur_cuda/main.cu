@@ -5,37 +5,45 @@
 // these are declared in main.h
 cudaError_t err = cudaSuccess;
 float *dImg, *dTmp1, *dTmp2, *dTmp3;
-unsigned int rowStride, channels, bufSize, blockSize;
+unsigned int channels, bufSize, blockSize;
 dim3 dimGrid, dimBlock;
 
-// copy d1 to d2, but change from unsigned char to float
-__global__ static void byteToFloat(byte *d1, float *d2, int h, int rs)
+// copy d1 to d2, but change from unsigned char to 3-channel float
+__global__ static void byteToFloat(byte *d1, float *d2, int h, int w, int ch)
 {
-	unsigned int y, x;
+	unsigned y, x, c;
 
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	if (y >= h || x >= rs) {
+	c = x % 3;
+	x /= 3;
+
+	// don't copy over alpha
+	if (y >= h || x >= w*ch || c==3) {
 		return;
 	}
 
-	d2[y*rs + x] = d1[y*rs + x];
+	d2[y*w*3 + x*3 + c] = d1[y*w*ch + x*ch + c];
 }
 
 // copy d1 to d2, but change from float to unsigned char
-__global__ static void floatToByte(float *d1, byte *d2, int h, int rs)
+__global__ static void floatToByte(float *d1, byte *d2, int h, int w, int ch)
 {
-	unsigned int y, x;
+	unsigned y, x, c;
 
 	// infer y, x, c from block/thread index
 	y = blockDim.y * blockIdx.y + threadIdx.y;
 	x = blockDim.x * blockIdx.x + threadIdx.x;
-	if (y >= h || x >= rs || (x%4==3)) {
+	c = x % 3;
+	x /= 3;
+
+	// don't copy over alpha
+	if (y >= h || x >= w*ch || c == 3) {
 		return;
 	}
 
-	d2[y*rs + x] = min(max(d1[y*rs + x], 0.), 255.);
+	d2[y*w*ch + x*ch + c] = min(max(d1[y*w*3 + x*3 + c], 0.), 255.);
 }
 
 // driver for function
@@ -44,7 +52,7 @@ __host__ int main(int argc, char **argv)
 	// allocate buffers for image, copy into contiguous array
 	byte *hImgPix = nullptr, *dImgPix = nullptr;
 	clock_t *t;
-	unsigned y, rounds, blurStd;
+	unsigned y, rounds, blurStd, rowStride;
 
 	// get input file from stdin
 	ERR(argc < 5, "usage: ./deblur INPUT.png OUTPUT.png ROUNDS BLURSTD");
@@ -92,7 +100,8 @@ __host__ int main(int argc, char **argv)
 	dimBlock = dim3(blockSize, blockSize, 1);
 
 	// convert image to float (dImgPix -> dImg)
-	byteToFloat<<<dimGrid, dimBlock>>>(dImgPix, dImg, height, rowStride);
+	byteToFloat<<<dimGrid, dimBlock>>>(dImgPix, dImg, height, width,
+		channels);
 	CUDAERR(cudaGetLastError(), "launch byteToFloat kernel");
 
 	// image processing routine
@@ -109,7 +118,8 @@ __host__ int main(int argc, char **argv)
 		<< "mult/div: " << clock_ave[CLOCK_MULTDIV] << "s" << std::endl;
 
 	// convert image back to byte (dImg -> dImgPix)
-	floatToByte<<<dimGrid, dimBlock>>>(dImg, dImgPix, height, rowStride);
+	floatToByte<<<dimGrid, dimBlock>>>(dImg, dImgPix, height, width,
+		channels);
 	CUDAERR(cudaGetLastError(), "launch floatToByte kernel");
 
 	// copy image back (dImgPix -> hImgPix)
