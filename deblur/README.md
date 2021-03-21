@@ -1,4 +1,9 @@
 # deblur
+Using Lucy-Richardson deconvolution with a circular
+Gaussian kernel to deblur an image (+ evaluation methods)
+
+### Report
+See the report [here][report].
 
 ### Build instructions
 Use the Makefile in this directory to build everything.
@@ -25,9 +30,6 @@ flags for the Makefile (see an example in [buildx86.sh][buildx86])
 ```bash
 $ make -C deblur_cuda CUDA_PATH=/usr TARGET_ARCH=x86_64 SMS=30 [TARGET]
 ```
-
-### Report
-coming soon...
 
 ### Results
 
@@ -103,5 +105,6 @@ Sharpness measure of samples/earth_deblurred_cuda_std4.png: 50.872707
 Sharpness measure of samples/earth.png: 1694.936890
 ```
 
+[report]: http://files.lambdalambda.ninja/reports/20-21_spring/ece453_proj1_deblur.pdf
 [infile]: samples/earth_blurry.png
 [buildx86]: deblur_cuda/buildx86.sh
