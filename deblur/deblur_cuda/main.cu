@@ -55,7 +55,7 @@ __host__ int main(int argc, char **argv)
 
 	// get input file from stdin
 	ERR(argc < 2, "missing input file as cmd parameter\n"
-		"\tusage: ./deblur [INPUT_FILE].png");
+		"\tusage: ./deblur INPUT.png OUTPUT.png");
 
 	// read input file
 	std::cout << "Reading file..." << std::endl;
@@ -130,7 +130,7 @@ __host__ int main(int argc, char **argv)
 
 	// write file
 	std::cout << "Writing file..." << std::endl;
-	write_png_file("out.png");
+	write_png_file(argv[2]);
 
 	std::cout << "Done." << std::endl;
 	return 0;

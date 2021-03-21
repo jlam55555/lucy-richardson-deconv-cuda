@@ -32,6 +32,9 @@ __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 		return;
 	}
 
+	// row stride (width * number of channels)
+	rs = ch*w1;
+
 	// don't mess with alpha
 	if (c == 3) {
 		d3[y*rs + x*ch + c] = 255;
@@ -43,9 +46,6 @@ __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 	imax = min(h1, y+h2/2+1);
 	jmin = max(0, x+w2/2-w2+1);
 	jmax = min(w1, x+w2/2+1);
-
-	// row stride (width * number of channels)
-	rs = ch*w1;
 
 	// convolution
 	// TODO: this only deals with the case where d2 has a single channel

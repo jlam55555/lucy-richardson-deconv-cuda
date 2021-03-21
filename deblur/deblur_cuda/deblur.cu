@@ -46,7 +46,6 @@ __global__ static void initImage(float *dImg, int height, int rowStride,
 __host__ static void deblurRound(float *g, unsigned fltSize)
 {
 	float *tmp;
-	unsigned i, j;
 
 	// convolution: tmp3 = f_i * g
 	// dTmp3 = dTmp1 * flt
