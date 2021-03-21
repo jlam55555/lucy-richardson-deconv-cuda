@@ -1,20 +1,25 @@
-BINARY:=deblur_eval
-SOURCES:=$(shell find *.c)
-OBJECTS:=$(SOURCES:%.c=%.o)
-
+# simple makefile to compile single files into their binaries with the
+# same name
 CFLAGS:=$(shell pkg-config --cflags libpng)
 LDFLAGS:=$(shell pkg-config --libs libpng) -lm
 
-$(BINARY): $(OBJECTS)
-	$(CC) $(LDFLAGS) -o $(BINARY) $(OBJECTS)
+# binaries to build
+BINARIES:=eval_error eval_sharpness
+
+.PHONY:
+all: $(BINARIES)
+
+# static pattern rule: https://stackoverflow.com/a/15718720
+$(BINARIES): %: %.o pngio.o
+	$(CC) $(LDFLAGS) -o $@ $< pngio.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 # target-specific variable values: https://stackoverflow.com/a/1080180
 debug: CFLAGS+= -g
-debug: $(BINARY)
+debug: $(BINARIES)
 
 .PHONY:
 clean:
-	rm -f $(BINARY) *.o
+	rm -f $(BINARIES) *.o

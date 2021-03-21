@@ -5,18 +5,6 @@
 
 typedef unsigned char byte;
 
-// calculates mean squared error per pixel channel
-float calculateError(byte *img1, byte *img2, unsigned size)
-{
-	unsigned i, err;
-
-	err = 0;
-	for (i = 0; i < size; ++i) {
-		err += pow(img1[i] - img2[i], 2);
-	}
-	return ((float) err) / size;
-}
-
 // see comment on the cuda version of this function
 // assume only three channels, no alpha channel
 // this is simplified a little to take byte inputs (but a float output)
@@ -65,14 +53,14 @@ void conv2d(byte *d1, float *d2, float *d3,
 
 // calculate measure of sharpness/blur using an edge-detection laplacian filter;
 // laplacian turns edges into elements with larger magnitude, so we simply
-// calculate the mean of the squared values after passing the edge filter
+// calculate the mean of the values after passing the edge filter
 // through (all data channels)
 //
 // see: https://stackoverflow.com/a/7767755
 float measureSharpness(byte *img, int channels, int height, int width)
 {
 	unsigned size = channels * height * width, i;
-	float sum, *convOut;
+	float contrast, *convOut;
 
 	// laplacian filter from https://stackoverflow.com/a/7766036
 	float flt[] = {0, 1, 0, 1, -4, 1, 0, 1, 0};
@@ -83,75 +71,54 @@ float measureSharpness(byte *img, int channels, int height, int width)
 	conv2d(img, flt, convOut, channels, height, width, fltSize, fltSize);
 
 	// sum over values in convolution output
-	sum = 0;
+	contrast = 0;
 	for (i = 0; i < size; ++i) {
-		sum += pow(convOut[i], 2);
+		contrast += pow(convOut[i], 2);
 	}
 
 	// cleanup
 	free(convOut);
 
-	return sum / size;
+	return contrast / size;
 }
 
 int main(int argc, char **argv)
 {
-	byte *img1, *img2, *img1g, *img2g;
-	unsigned channels, bufSize, j, i;
+	byte *img;
+	unsigned channels, bufSize, j, i, k;
 
 	// get files
-	if (argc < 3) {
-		printf("usage: ./eval_deblur [ORIGINAL].png [BLURRY].png\n");
+	if (argc < 2) {
+		printf("usage: %s IMG.png [IMG2.png ...]\n",
+			"\tmeasures the sharpness of each image\n", argv[0]);
 		return -1;
 	}
 
-	// read in original and copy to buffer
-	printf("Reading original file\n");
-	read_png_file(argv[1]);
+	for (k = 1; k < argc; ++k) {
+		// read in image and copy to buffer
+		read_png_file(argv[k]);
 
-	channels = color_type==PNG_COLOR_TYPE_RGBA ? 4 : 3;
-	bufSize = (width * 3) * height;
+		channels = color_type==PNG_COLOR_TYPE_RGBA ? 4 : 3;
+		bufSize = (width * 3) * height;
 
-	img1 = malloc(bufSize);
-	img2 = malloc(bufSize);
+		img = malloc(bufSize);
 
-	// only copy rgb values
-	for (j = 0; j < height; ++j) {
+		// only copy rgb values
+		for (j = 0; j < height; ++j) {
 		for (i = 0; i < width; ++i) {
-			img1[j*width*3 + i*3] = row_pointers[j][i*channels];
-			img1[j*width*3 + i*3+1] = row_pointers[j][i*channels+1];
-			img1[j*width*3 + i*3+2] = row_pointers[j][i*channels+2];
+			img[j*width*3 + i*3] = row_pointers[j][i*channels];
+			img[j*width*3 + i*3+1] = row_pointers[j][i*channels+1];
+			img[j*width*3 + i*3+2] = row_pointers[j][i*channels+2];
 		}
-	}
-
-	// calculate and print sharpness estimate
-	printf("Sharpness measure of original: %f\n",
-		measureSharpness(img1, channels, height, width));
-
-	// read in deblurred and copy to buffer
-	printf("Reading deblurred file\n");
-	read_png_file(argv[2]);
-
-	channels = color_type==PNG_COLOR_TYPE_RGBA ? 4 : 3;
-
-	for (j = 0; j < height; ++j) {
-		for (i = 0; i < width; ++i) {
-			img2[j*width*3 + i*3] = row_pointers[j][i*channels];
-			img2[j*width*3 + i*3+1] = row_pointers[j][i*channels+1];
-			img2[j*width*3 + i*3+2] = row_pointers[j][i*channels+2];
 		}
+
+		// calculate and print sharpness estimate
+		printf("Sharpness measure of %s: %f\n", argv[k],
+			measureSharpness(img, 3, height, width));
+
+		// cleanup
+		free(img);
 	}
-
-	// calculate and print error
-	printf("MSE (per datapoint): %f\n",
-		calculateError(img1, img2, bufSize));
-
-	printf("Sharpness measure of blurry: %f\n",
-		measureSharpness(img2, 3, height, width));
-
-	// cleanup
-	free(img1);
-	free(img2);
 
 	return 0;
 }
