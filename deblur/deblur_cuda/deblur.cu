@@ -1,4 +1,5 @@
 #include "main.h"
+#include "clock.h"
 
 // pointwise multiplication/division of two vectors
 __global__ static void pointwiseMultDiv(float *dA, float *dB, float *dC,
@@ -46,6 +47,7 @@ __global__ static void initImage(float *dImg, int height, int rowStride,
 __host__ static void deblurRound(float *g, unsigned fltSize)
 {
 	float *tmp;
+	clock_t *t = clock_start();
 
 	// convolution: tmp3 = f_i * g
 	// dTmp3 = dTmp1 * flt
@@ -53,11 +55,15 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 1");
 
+	clock_lap(t, CLOCK_CONV2D);
+
 	// pointwise division: tmp2 = c / tmp3
 	// dTmp2 = dImg / dTmp3
 	pointwiseMultDiv<<<dimGrid, dimBlock>>>(dImg, dTmp3, dTmp2, height,
 		rowStride, channels, false);
 	CUDAERR(cudaGetLastError(), "launch div kernel");
+
+	clock_lap(t, CLOCK_MULTDIV);
 
 	// convolution: tmp3 = tmp2 * g(-x) = tmp2 * g (g is symmetric)
 	// dTmp3 = dTmp2 * g
@@ -65,17 +71,23 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 2");
 
+	clock_lap(t, CLOCK_CONV2D);
+
 	// pointwise multiplication: tmp2 = (tmp3)(f_i)
 	// dTmp2 = (dTmp3)(dTmp1)
 	pointwiseMultDiv<<<dimGrid, dimBlock>>>(dTmp3, dTmp1, dTmp2, height,
 		rowStride, channels, true);
 	CUDAERR(cudaGetLastError(), "launch mult kernel");
 
+	clock_lap(t, CLOCK_MULTDIV);
+
 	// swap pointers so that f_i = dTmp1
 	// dTmp2, dTmp1 = dTmp1, dTmp2
 	tmp = dTmp2;
 	dTmp2 = dTmp1;
 	dTmp1 = tmp;
+
+	free(t);
 }
 
 // lucy richardson deblur: deblurs what is in dImg
@@ -83,6 +95,7 @@ __host__ void deblur(int rounds, int blurSize)
 {
 	float *hFlt, *dFlt, *tmp;
 	unsigned fltSize, i;
+	clock_t *t;
 
 	// initialize f_0 (initial estimate)
 	initImage<<<dimGrid, dimBlock>>>(dTmp1, height, rowStride, channels);
@@ -96,8 +109,10 @@ __host__ void deblur(int rounds, int blurSize)
 		"flt");
 
 	// lucy-richardson iteration
+	t = clock_start();
 	for (i = 0; i < rounds; ++i) {
 		deblurRound(dFlt, fltSize);
+		clock_lap(t, CLOCK_ROUND);
 	}
 
 	// dTmp1 is currently pointing at f_i (the estimate)
@@ -106,6 +121,7 @@ __host__ void deblur(int rounds, int blurSize)
 	dImg = tmp;
 
 	// cleanup
+	free(t);
 	free(hFlt);
 	free_d(dFlt, "dFlt");
 }

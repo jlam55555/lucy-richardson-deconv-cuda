@@ -51,11 +51,11 @@ __host__ int main(int argc, char **argv)
 {
 	// allocate buffers for image, copy into contiguous array
 	byte *hImgPix = nullptr, *dImgPix = nullptr;
+	clock_t *t;
 	unsigned int y;
 
 	// get input file from stdin
-	ERR(argc < 2, "missing input file as cmd parameter\n"
-		"\tusage: ./deblur INPUT.png OUTPUT.png");
+	ERR(argc < 3, "usage: ./deblur INPUT.png OUTPUT.png");
 
 	// read input file
 	std::cout << "Reading file..." << std::endl;
@@ -103,7 +103,15 @@ __host__ int main(int argc, char **argv)
 
 	// image processing routine
 	std::cout << "Processing image..." << std::endl;
+	t = clock_start();
 	processImage();
+	clock_lap(t, CLOCK_OVERALL);
+
+	// print statistics
+	std::cout << "overall: " << clock_ave[CLOCK_OVERALL] << "s" << std::endl
+		<< "round: " << clock_ave[CLOCK_ROUND] << "s" << std::endl
+		<< "conv2d: " << clock_ave[CLOCK_CONV2D] << "s" << std::endl
+		<< "mult/div: " << clock_ave[CLOCK_MULTDIV] << "s" << std::endl;
 
 	// convert image back to byte (dImg -> dImgPix)
 	floatToByte<<<dimGrid, dimBlock>>>(dImg, dImgPix, height, rowStride);
@@ -112,8 +120,6 @@ __host__ int main(int argc, char **argv)
 	// copy image back (dImgPix -> hImgPix)
 	CUDAERR(cudaMemcpy(hImgPix, dImgPix, bufSize, cudaMemcpyDeviceToHost),
 		"copying image from device");
-
-	std::cout << "value at 0: " << ((int)hImgPix[0]) << std::endl;
 
 	// copy image back into original pixel buffers
 	for (y = 0; y < height; ++y) {
@@ -127,6 +133,7 @@ __host__ int main(int argc, char **argv)
 	CUDAERR(cudaFree(dTmp3), "freeing dTmp2");
 	CUDAERR(cudaFree(dImgPix), "freeing dImgPix");
 	free(hImgPix);
+	free(t);
 
 	// write file
 	std::cout << "Writing file..." << std::endl;

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "clock.h"
 
 #define ERR(cond, msg)\
 	if (cond) {\
@@ -47,5 +48,8 @@ __host__ void deblur(int rounds, int blurSize);
 // conv2d.cu
 __global__ void conv2d(float *d1, float *d2, float *d3, int ch,
 	int h1, int w1, int h2, int w2);
+
+// clock types
+enum { CLOCK_CONV2D, CLOCK_MULTDIV, CLOCK_ROUND, CLOCK_OVERALL };
 
 #endif // MAIN_H
