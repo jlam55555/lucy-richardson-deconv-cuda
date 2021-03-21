@@ -54,7 +54,6 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 	conv2d<<<dimGrid, dimBlock>>>(dTmp1, g, dTmp3, channels,
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 1");
-
 	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_CONV2D);
 
@@ -63,7 +62,6 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 	pointwiseMultDiv<<<dimGrid, dimBlock>>>(dImg, dTmp3, dTmp2, height,
 		rowStride, channels, false);
 	CUDAERR(cudaGetLastError(), "launch div kernel");
-
 	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_MULTDIV);
 
@@ -72,7 +70,6 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 	conv2d<<<dimGrid, dimBlock>>>(dTmp2, g, dTmp3, channels,
 		height, width, fltSize, fltSize);
 	CUDAERR(cudaGetLastError(), "launch conv2d kernel 2");
-
 	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_CONV2D);
 
@@ -81,7 +78,6 @@ __host__ static void deblurRound(float *g, unsigned fltSize)
 	pointwiseMultDiv<<<dimGrid, dimBlock>>>(dTmp3, dTmp1, dTmp2, height,
 		rowStride, channels, true);
 	CUDAERR(cudaGetLastError(), "launch mult kernel");
-
 	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_MULTDIV);
 

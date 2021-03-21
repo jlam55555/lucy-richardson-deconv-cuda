@@ -103,24 +103,26 @@ void pointwiseMultDiv(float *dA, float *dB, float *dC, int size, int isMult)
 void deblurRound(float *g, unsigned fltSize)
 {
 	float *tmp;
+	clock_t *t = clock_start();
 
 	conv2d(dTmp1, g, dTmp3, 3, height, width, fltSize, fltSize);
+	clock_lap(t, CLOCK_CONV2D);
 
 	pointwiseMultDiv(dImg, dTmp3, dTmp2, bufSize, 0);
-
-//	tmp = dTmp2;
-//	dTmp2 = dTmp1;
-//	dTmp1 = tmp;
-//	return;
+	clock_lap(t, CLOCK_MULTDIV);
 
 	conv2d(dTmp2, g, dTmp3, 3, height, width, fltSize, fltSize);
+	clock_lap(t, CLOCK_CONV2D);
 
 	pointwiseMultDiv(dTmp3, dTmp1, dTmp2, bufSize, 1);
+	clock_lap(t, CLOCK_MULTDIV);
 
 	// swap pointers
 	tmp = dTmp2;
 	dTmp2 = dTmp1;
 	dTmp1 = tmp;
+
+	free(t);
 }
 
 // lucy-richardson deconvolution with a gaussian kernel
@@ -128,6 +130,7 @@ void deblur(int iterations, int blurStd)
 {
 	float *flt, *tmp;
 	int fltSize, i;
+	clock_t *t;
 
 	// create gaussian filter
 	flt = gaussian_filter(blurStd, &fltSize);
@@ -138,9 +141,11 @@ void deblur(int iterations, int blurStd)
 	}
 
 	// iterate!
+	t = clock_start();
 	for (i = 0; i < iterations; ++i) {
 		printf("Round %d\n", i);
 		deblurRound(flt, fltSize);
+		clock_lap(t, CLOCK_ROUND);
 	}
 
 	// img currently in dTmp1, move to dImg
@@ -150,23 +155,22 @@ void deblur(int iterations, int blurStd)
 
 	// cleanup
 	free(flt);
-}
-
-void processImage()
-{
-	deblur(25, 2);
+	free(t);
 }
 
 int main(int argc, char **argv)
 {
-	unsigned y, x;
+	unsigned y, x, rounds, blurStd;
+	clock_t *t;
 
 	// get input file from stdin
 	if (argc < 2) {
-		printf("missing input file as cmd parameter\n"
-			"\tusage: ./deblur [INPUT_FILE].png\n");
+		printf("usage: %s INPUT.png OUTPUT.png ROUNDS BLURSTD",
+			argv[0]);
 		return -1;
 	}
+	rounds = atoi(argv[3]);
+	blurStd = atoi(argv[4]);
 
 	// read input file
 	printf("Reading file...\n");
@@ -198,7 +202,16 @@ int main(int argc, char **argv)
 
 	// begin processing
 	printf("Processing image...\n");
-	processImage();
+	t = clock_start();
+	deblur(rounds, blurStd);
+	clock_lap(t, CLOCK_OVERALL);
+
+	// print timing statistics
+	printf("overall: %fs\nround: %fs\nconv2d: %f\nmult/div: %f\n",
+		clock_ave[CLOCK_OVERALL],
+		clock_ave[CLOCK_ROUND],
+		clock_ave[CLOCK_CONV2D],
+		clock_ave[CLOCK_MULTDIV]);
 
 	// copy image back from dImg; leave alpha channel as is
 	for (y = 0; y < height; ++y) {
@@ -214,13 +227,14 @@ int main(int argc, char **argv)
 
 	// write file
 	printf("Writing image...\n");
-	write_png_file("out.png");
+	write_png_file(argv[2]);
 
 	// cleanup
 	free(dImg);
 	free(dTmp1);
 	free(dTmp2);
 	free(dTmp3);
+	free(t);
 
 	printf("Done\n");
 	return 0;

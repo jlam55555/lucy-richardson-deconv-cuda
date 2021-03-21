@@ -102,7 +102,7 @@ __host__ int main(int argc, char **argv)
 	cudaDeviceSynchronize();
 	clock_lap(t, CLOCK_OVERALL);
 
-	// print statistics
+	// print timing statistics
 	std::cout << "overall: " << clock_ave[CLOCK_OVERALL] << "s" << std::endl
 		<< "round: " << clock_ave[CLOCK_ROUND] << "s" << std::endl
 		<< "conv2d: " << clock_ave[CLOCK_CONV2D] << "s" << std::endl
